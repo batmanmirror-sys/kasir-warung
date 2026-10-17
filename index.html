@@ -48,4 +48,99 @@ $('restoreFile').addEventListener('change',async e=>{candidate=null;let f=e.targ
 $('restore').addEventListener('click',()=>{let n=candidate&&(candidate.data||candidate);if(!n||!Array.isArray(n.products)||!Array.isArray(n.sales)){alert('Pilih file cadangan JSON yang valid.');return}if(confirm('Data sekarang akan diganti dengan cadangan. Lanjutkan?')){data=n;cart={};persist();alert('Data dipulihkan.')}});
 $('csv').addEventListener('click',()=>{let rows=[['Invoice','Tanggal','Produk','Jumlah','Harga','Subtotal','Total','Dibayar','Kembalian']];data.sales.forEach(s=>s.items.forEach(i=>rows.push([s.invoice,s.date,i.name,i.qty,i.price,i.subtotal,s.total,s.paid,s.change])));let csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');dl('riwayat-kasir-warung.csv','\ufeff'+csv,'text/csv;charset=utf-8')});
 render();
+function renderHistory() {
+  $('historyList').innerHTML = data.sales.slice().reverse().map(s => `
+    <div class="history">
+      <div class="row between">
+        <b>${esc(s.invoice)}</b>
+        <b>${money(s.total)}</b>
+      </div>
+      <div class="muted">${new Date(s.date).toLocaleString('id-ID')}</div>
+      <div class="muted">${s.items.map(i => esc(i.name) + ' × ' + i.qty).join(', ')}</div>
+      <button class="primary small" style="margin-top:8px"
+        onclick="printSale('${s.invoice}')">Cetak struk</button>
+    </div>
+  `).join('') || '<div class="empty">Belum ada transaksi.</div>';
+}
+
+function printSale(invoice) {
+  const s = data.sales.find(x => x.invoice === invoice);
+  if (!s) {
+    alert('Transaksi tidak ditemukan.');
+    return;
+  }
+
+  const w = window.open('', '_blank', 'width=420,height=650');
+  if (!w) {
+    alert('Izinkan pop-up agar struk bisa dicetak.');
+    return;
+  }
+
+  const rows = s.items.map(i => `
+    <div class="item">
+      <div>${esc(i.name)} × ${i.qty}</div>
+      <div class="line">
+        <span>${money(i.price)} / pcs</span>
+        <b>${money(i.subtotal)}</b>
+      </div>
+    </div>
+  `).join('');
+
+  w.document.write(`<!doctype html>
+  <html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Struk ${esc(s.invoice)}</title>
+    <style>
+      body {
+        font: 12px monospace;
+        color: #000;
+        width: 72mm;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 4mm;
+        box-sizing: border-box;
+      }
+      h2, p { text-align: center; margin: 5px 0; }
+      h2 { font-size: 17px; }
+      .dash { border-top: 1px dashed #000; margin: 8px 0; }
+      .item { margin: 7px 0; }
+      .line, .totalrow {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .totalrow { margin: 5px 0; }
+      .thanks { text-align: center; margin-top: 14px; }
+      @media print {
+        body { width: 72mm; padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <h2>KASIR WARUNG</h2>
+    <p>Terima kasih sudah berbelanja</p>
+    <div class="dash"></div>
+    <div>Invoice: ${esc(s.invoice)}</div>
+    <div>Tanggal: ${new Date(s.date).toLocaleString('id-ID')}</div>
+    <div class="dash"></div>
+    ${rows}
+    <div class="dash"></div>
+    <div class="totalrow"><b>TOTAL</b><b>${money(s.total)}</b></div>
+    <div class="totalrow"><span>Dibayar</span><span>${money(s.paid)}</span></div>
+    <div class="totalrow"><span>Kembalian</span><span>${money(s.change)}</span></div>
+    <div class="dash"></div>
+    <p class="thanks">Terima kasih 🙏<br>Selamat berbelanja kembali</p>
+  </body>
+  </html>`);
+
+  w.document.close();
+  setTimeout(() => {
+    w.focus();
+    w.print();
+  }, 700);
+}
+
+renderHistory();  
 </script></body></html>
